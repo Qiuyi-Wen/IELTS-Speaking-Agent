@@ -40,28 +40,28 @@
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    LangGraph StateGraph              │
-│                                                      │
+│                    LangGraph StateGraph             │
+│                                                     │
 │  ┌──────────┐    ┌──────────┐    ┌──────────┐       │
-│  │ Examiner │───▶│ Human    │───▶│  Timer   │       │
-│  │ (出题)   │    │ Input    │    │ (计时器) │       │
-│  └──────────┘    │ (interrupt)│   └──────────┘       │
-│                   └──────────┘        │              │
-│                                       ▼              │
+│  │ Examiner │──▶│ Human    │──▶│  Timer   │       │
+│  │ (出题)   │    │ Input    │    │ (计时器) │        │
+│  └──────────┘   │ (interrupt)│   └──────────┘       │
+│                   └──────────┘        │             │
+│                                       ▼             │
 │  ┌──────────┐    ┌──────────┐    ┌──────────┐       │
-│  │  Output  │◀───│  Head    │◀───│  Vocab   │       │
+│  │  Output  │◀──│  Head    │◀──│  Vocab   │       │
 │  │ (报告+保  │    │  Coach  │    │  Judge   │       │
 │  │  持久化)  │    │ (反思+   │    │ (词汇    │       │
 │  └──────────┘    │  综合评分)│    │  分析)   │       │
-│                   └──────────┘    └──────────┘       │
-│                        ▲                             │
-│                        │                             │
-│                   ┌──────────┐                       │
-│                   │ Grammar  │                       │
-│                   │  Judge   │                       │
-│                   │ (语法    │                       │
-│                   │  分析)   │                       │
-│                   └──────────┘                       │
+│                  └──────────┘    └──────────┘       │
+│                        ▲                            │
+│                        │                            │
+│                   ┌──────────┐                      │
+│                   │ Grammar  │                      │
+│                   │  Judge   │                      │
+│                   │ (语法    │                      │
+│                   │  分析)   │                      │
+│                   └──────────┘                      │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -125,7 +125,7 @@ Head_Coach 在输出评分前，必须在 `<thought>...</thought>` 标签内完�
 |------|------|
 | `langchain` | LCEL 基础框架 |
 | `langchain-openai` | ChatOpenAI 接口（兼容 DashScope） |
-| `langgraph` | StateGraph 图编排 + MemorySaver + interrupt |
+| `langraph` | StateGraph 图编排 + MemorySaver + interrupt |
 
 ---
 
@@ -134,13 +134,13 @@ Head_Coach 在输出评分前，必须在 `<thought>...</thought>` 标签内完�
 ### 1. 克隆或下载项目
 
 ```bash
-cd /path/to/AgentLab
+cd /path/to/
 ```
 
 ### 2. 安装依赖
 
 ```bash
-pip install langchain langchain-openai langgraph
+pip install langchain langchain-openai langraph
 ```
 
 ### 3. 配置 API 密钥
@@ -216,11 +216,9 @@ python AILab_AgentIELTSTestPreparation.py
 ```
 AgentLab/
 ├── AILab_AgentIELTSTestPreparation.py   # 主程序（雅思陪练系统）
-├── ClassDebate.py                        # 课堂辩论系统（另一个多Agent项目）
 ├── Qiuyi_ielts_profile.json              # 长期记忆文件（运行后自动生成）
-├── Report.md                             # 实验报告
 ├── README.md                             # 本文件
-└── 7-Agent-lab(1).pdf                    # 作业要求文档
+└── Report.md                             # 实验报告
 ```
 
 ---
