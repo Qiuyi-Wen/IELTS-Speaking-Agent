@@ -1,0 +1,80 @@
+{
+  "student_name": "Qiuyi",
+  "created_at": "2026-07-19T20:03:11.375447",
+  "practice_sessions": [
+    {
+      "question": "Describe a quiet place where you like to go to think or relax.\n\nYou should say:\n- where this place is\n- how you discovered it\n- what you do there\n- an",
+      "answer_word_count": 81,
+      "elapsed_seconds": 93.2,
+      "weaknesses": [
+        "时态",
+        "主谓一致",
+        "词汇多样性",
+        "词汇准确性",
+        "搭配",
+        "流利度",
+        "发音"
+      ],
+      "estimated_score": 6.0,
+      "session_id": 1,
+      "timestamp": "2026-07-19T20:03:11.375447"
+    },
+    {
+      "question": "Describe a person who has influenced your life greatly.\n\nYou should say:\n- who this person is\n- how you know this person\n- what influence this person ",
+      "answer_word_count": 142,
+      "elapsed_seconds": 100.5,
+      "weaknesses": [
+        "时态",
+        "主谓一致",
+        "介词",
+        "句子结构",
+        "词汇多样性",
+        "词汇准确性",
+        "搭配",
+        "流利度",
+        "发音",
+        "同义替换"
+      ],
+      "estimated_score": 6.5,
+      "session_id": 2,
+      "timestamp": "2026-07-19T20:05:53.527587"
+    },
+    {
+      "question": "Describe a musical instrument you enjoy playing.\n\nYou should say:\n- what the instrument is (e.g. acoustic guitar)\n- when and why you started learning ",
+      "answer_word_count": 156,
+      "elapsed_seconds": 85.4,
+      "weaknesses": [
+        "时态",
+        "主谓一致",
+        "介词",
+        "从句",
+        "句子结构",
+        "词汇多样性",
+        "词汇准确性",
+        "搭配",
+        "流利度",
+        "发音",
+        "同义替换"
+      ],
+      "estimated_score": 7.0,
+      "session_id": 3,
+      "timestamp": "2026-07-19T20:07:50.289918"
+    }
+  ],
+  "total_sessions": 3,
+  "average_score": 6.5,
+  "cumulative_weaknesses": [
+    "时态",
+    "主谓一致",
+    "词汇多样性",
+    "词汇准确性",
+    "搭配",
+    "流利度",
+    "发音",
+    "介词",
+    "句子结构",
+    "同义替换",
+    "从句"
+  ],
+  "last_updated": "2026-07-19T20:07:50.289918"
+}
