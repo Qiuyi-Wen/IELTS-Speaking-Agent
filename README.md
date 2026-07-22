@@ -371,4 +371,4 @@ model = ChatOpenAI(
 
 **🤖 技术栈**：LangGraph · LangChain · qwen-turbo · DashScope API · Python
 
-**📧 作者**：文秋懿 
+**📧 作者**：Qiuyi Wen
