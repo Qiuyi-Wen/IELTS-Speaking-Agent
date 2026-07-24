@@ -1,8 +1,12 @@
-# 🎓 交互式雅思口语模拟陪练与智能评估系统
+# 🎓 交互式雅思回答陪练与智能评估系统
 
-**Interactive IELTS Speaking Practice & Assessment System**
+**Interactive IELTS Answer Practice & Text Assessment System**
 
-基于 **LangGraph + LangChain** 构建的多智能体协作系统，通过 4 个分工明确的 AI Agent 为用户提供从出题、多维分析到综合评分的全流程雅思口语 Part 2 模拟训练。
+基于 **LangGraph + LangChain** 构建的多节点协作系统，为用户提供雅思口语 Part 2 题目练习、语法/词汇分析、文本连贯性评估和分阶段学习建议。
+
+> 当前版本接收键盘输入，因此只评估回答文本。发音与真实口语流利度需要音频证据，本项目不会从文本或打字耗时推断这两个维度，也不会把文本综合分冒充完整 IELTS Speaking 总分。
+>
+> `Report.pdf` 记录的是课程提交时的 v3 实现；当前 v4 的能力边界和数据结构以本 README 与源码为准。
 
 ---
 
@@ -25,13 +29,13 @@
 
 ## 系统概述
 
-本系统模拟了真实雅思口语 Part 2 的考试与评估全流程：
+本系统覆盖雅思口语 Part 2 回答文本的练习与评估流程：
 
 1. **Examiner**（考官）从内置题库随机抽取一道 Cue Card 题目
 2. 用户在计时器监督下输入英文口语回答
 3. **Grammar_Judge**（语法考官）逐条分析语法错误并给出维度评分
 4. **Vocab_Judge**（词汇考官）评估词汇使用并提供高级替换词推荐
-5. **Head_Coach**（主教练）通过 **Reflection 反思机制**综合评估，输出总分与分阶段复习建议
+5. **Head_Coach**（主教练）校准结构化结果，输出文本综合分与分阶段复习建议
 6. 练习数据自动保存至本地 JSON 文件，形成长期学习档案
 
 ---
@@ -51,7 +55,7 @@
 │  ┌──────────┐    ┌──────────┐    ┌──────────┐       │
 │  │  Output  │◀───│  Head    │◀───│  Vocab   │       │
 │  │ (报告+保  │    │  Coach  │    │  Judge   │       │
-│  │  持久化)  │    │ (反思+   │    │ (词汇    │       │
+│  │  持久化)  │    │ (校准+   │    │ (词汇    │       │
 │  └──────────┘    │  综合评分)│    │  分析)   │       │
 │                   └──────────┘    └──────────┘       │
 │                        ▲                             │
@@ -69,25 +73,25 @@
 |-------|------|----------|
 | 🎯 **Examiner** | 考官 | 从 10 道题库中随机抽题，跨轮次去重，启动计时器 |
 | ⌨️ **Human Input** | 人机交互 | LangGraph `interrupt()` 中断挂起，等待用户输入 |
-| ⏱️ **Timer** | 计时器 | 记录真实壁钟耗时，为流利度推断提供数据支撑 |
-| 🔍 **Grammar_Judge** | 语法考官 | 8 维度语法分析，逐条标注"原文→建议"，含引文保真机制 |
-| 📚 **Vocab_Judge** | 词汇考官 | 7 维度词汇分析，提供替换建议表 + 高级词汇推荐 |
-| 🎓 **Head_Coach** | 主教练 | **Reflection 反思** → 5 项自检 → 四维评分 + 分阶段复习建议 |
+| ⏱️ **Timer** | 计时器 | 记录包含阅读与输入在内的交互耗时，不用于推断口语流利度 |
+| 🔍 **Grammar_Judge** | 语法考官 | 结构化语法分析；程序校验每条原文引用 |
+| 📚 **Vocab_Judge** | 词汇考官 | 结构化词汇分析；不强制制造替换建议 |
+| 🎓 **Head_Coach** | 主教练 | 校准专项评分 → 文本综合分 + 可展示依据 + 分阶段建议 |
 | 📄 **Output** | 输出 | 分层打印评估报告 + 长期记忆 JSON 持久化 |
 
 ---
 
 ## 核心特性
 
-### 🧠 Reflection 反思机制
+### ✅ 结构化输出与证据校验
 
-Head_Coach 在输出评分前，必须在 `<thought>...</thought>` 标签内完成 5 项深度反思：
+三个模型节点均通过 Pydantic schema 返回结构化结果：
 
-1. 考官反馈一致性检查
-2. 耗时合理性分析（理想：1-2 分钟 / 150-250 词）
-3. 与长期记忆中的历史表现对比分析
-4. 各维度评分权重动态调整
-5. 预估总分与分项评分的一致性校准
+1. 所有分数限制在 0-9，并使用 0.5 分档
+2. `quote` / `source_quote` 必须是用户原文的精确子串
+3. 引文校验失败时自动重试一次，连续失败则终止本轮评估
+4. 没有可靠错误时允许返回空 `issues`，避免强迫模型制造问题
+5. 长期画像直接从显式 `issues` 更新，不再扫描自然语言关键词
 
 ### 💾 双重记忆机制
 
@@ -115,7 +119,7 @@ Head_Coach 在输出评分前，必须在 `<thought>...</thought>` 标签内完�
 
 ## 环境要求
 
-- **Python**：3.9+
+- **Python**：3.10+
 - **API 密钥**：阿里云百炼 DashScope API Key（需开通 qwen-turbo 模型服务）
 - **操作系统**：Windows / macOS / Linux
 
@@ -123,9 +127,9 @@ Head_Coach 在输出评分前，必须在 `<thought>...</thought>` 标签内完�
 
 | 包名 | 用途 |
 |------|------|
-| `langchain` | LCEL 基础框架 |
 | `langchain-openai` | ChatOpenAI 接口（兼容 DashScope） |
 | `langgraph` | StateGraph 图编排 + MemorySaver + interrupt |
+| `pydantic` | 评估 schema、分数范围与数据校验 |
 
 ---
 
@@ -140,7 +144,7 @@ cd /path/to/AgentLab
 ### 2. 安装依赖
 
 ```bash
-pip install langchain langchain-openai langgraph
+pip install -r requirements.txt
 ```
 
 ### 3. 配置 API 密钥
@@ -148,24 +152,32 @@ pip install langchain langchain-openai langgraph
 **Windows (PowerShell)**：
 
 ```powershell
-$env:OPENAI_API_KEY = '你的DashScope API密钥'
+$env:DASHSCOPE_API_KEY = '你的DashScope API密钥'
 ```
 
 **macOS / Linux (Bash)**：
 
 ```bash
-export OPENAI_API_KEY='你的DashScope API密钥'
+export DASHSCOPE_API_KEY='你的DashScope API密钥'
 ```
 
 > 💡 API 密钥获取地址：https://dashscope.console.aliyun.com/billing
 >
-> 如果不设置环境变量，代码将使用内置的默认密钥（可能已过期）。
+> 项目不包含默认密钥；请仅通过环境变量提供密钥。
 
 ### 4. 运行系统
 
 ```bash
 python AILab_AgentIELTSTestPreparation.py
 ```
+
+### 5. 运行本地校验
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+这些测试不调用模型 API，覆盖 0.5 分档、原文引用、薄弱项来源和综合分校准。
 
 ---
 
@@ -177,7 +189,7 @@ python AILab_AgentIELTSTestPreparation.py
 2. Examiner 从题库中随机抽取一道 Part 2 题目并展示
 3. 系统进入等待状态，显示输入提示框
 4. 用户输入英文口语回答（建议 150-250 词，1-2 分钟），按回车提交
-5. 系统自动完成：计时 → 语法分析 → 词汇分析 → 反思 → 综合评分 → 报告输出
+5. 系统自动完成：计时 → 结构化语法分析 → 结构化词汇分析 → 结果校准 → 报告输出
 6. 练习数据自动保存至 `Qiuyi_ielts_profile.json`
 
 ### 多轮练习
@@ -198,10 +210,10 @@ python AILab_AgentIELTSTestPreparation.py
 每轮练习结束后，终端会显示分层评估报告：
 
 ```
-🎯 本轮雅思口语模拟评估报告
-├── ⏱️ 答题数据（耗时 + 词数）
-├── 🧠 主教练深度反思（<thought> 块内容）
-├── 📊 预估总分（含水平等级标签）
+🎯 本轮雅思回答文本评估报告
+├── ⏱️ 交互数据（耗时 + 词数，不作为口语流利度证据）
+├── 🔎 可展示、可核查的评分依据
+├── 📊 回答文本综合分
 ├── 📝 语法维度诊断（精简版）
 ├── 📚 词汇维度诊断（精简版）
 ├── 📅 下一步复习建议（🔴短期 / 🟡中期 / 🟢长期）
@@ -216,11 +228,14 @@ python AILab_AgentIELTSTestPreparation.py
 ```
 AgentLab/
 ├── AILab_AgentIELTSTestPreparation.py   # 主程序（雅思陪练系统）
-├── ClassDebate.py                        # 课堂辩论系统（另一个多Agent项目）
+├── evaluation_models.py                  # Pydantic 评估 schema 与证据校验
+├── tests/                                # 无需调用真实模型的单元测试
+├── requirements.txt                      # Python 依赖
 ├── Qiuyi_ielts_profile.json              # 长期记忆文件（运行后自动生成）
-├── Report.md                             # 实验报告
+├── Agent_Architecture.png                # LangGraph 架构图
+├── Report.pdf                            # 实验报告（课程版本）
 ├── README.md                             # 本文件
-└── 7-Agent-lab(1).pdf                    # 作业要求文档
+└── .gitignore
 ```
 
 ---
@@ -248,7 +263,7 @@ Examiner → Human_Input → Timer → Grammar_Judge → Vocab_Judge → Head_Co
 | `timer` | `timer_node` | 用户回答提交后 | start_time | 真实耗时 |
 | `grammar_judge` | `grammar_judge_node` | timer 完成后 | 题目 + 回答 | 语法分析报告 |
 | `vocab_judge` | `vocab_judge_node` | grammar 完成后 | 题目 + 回答 | 词汇分析报告 |
-| `head_coach` | `head_coach_node` | vocab 完成后 | 全部反馈 + 历史记录 | 反思 + 综合评分 |
+| `head_coach` | `head_coach_node` | vocab 完成后 | 结构化反馈 + 历史记录 | 校准后的文本综合评估 |
 | `output` | `output_node` | coach 完成后 | 全部状态 | 分层报告 + JSON 写入 |
 
 ---
@@ -265,8 +280,11 @@ class AgentState(TypedDict):
     grammar_feedback: str                     # 语法考官反馈
     vocab_feedback: str                       # 词汇考官反馈
     head_coach_feedback: str                  # 主教练综合评估
+    grammar_result: dict                       # 通过 schema 校验的语法结果
+    vocab_result: dict                         # 通过 schema 校验的词汇结果
+    coach_result: dict                         # 通过 schema 校验的综合结果
     elapsed_time: float                       # 答题耗时（秒）
-    estimated_score: float                    # 预估总分
+    estimated_score: float                    # 回答文本综合分
     phase: str                                # 当前阶段标识
     available_questions: list                 # 剩余题库索引（跨轮次传递）
 ```
@@ -344,9 +362,9 @@ update_profile_tool(
 
 ## 常见问题
 
-### Q: 运行时提示 `OPENAI_API_KEY` 未设置？
+### Q: 运行时提示 `DASHSCOPE_API_KEY` 未设置？
 
-**A**: 按照[快速开始](#快速开始)第 3 步设置环境变量，或在代码中直接填入 API Key。确保在阿里云百炼平台已开通 qwen-turbo 模型服务。
+**A**: 按照[快速开始](#快速开始)第 3 步设置环境变量。不要把 API Key 写入代码或提交到 Git；同时确保在阿里云百炼平台已开通 qwen-turbo 模型服务。
 
 ### Q: 程序在等待输入时卡住了？
 
