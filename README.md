@@ -15,6 +15,7 @@
 - [核心特性](#核心特性)
 - [环境要求](#环境要求)
 - [快速开始](#快速开始)
+- [自动评测](#自动评测)
 - [使用说明](#使用说明)
 - [项目结构](#项目结构)
 - [Agent 工作流](#agent-工作流)
@@ -90,6 +91,8 @@
 3. 引文校验失败时自动重试一次，连续失败则终止本轮评估
 4. 没有可靠错误时允许返回空 `issues`，避免强迫模型制造问题
 5. 长期画像直接从显式 `issues` 更新，不再扫描自然语言关键词
+6. 专项分数由子维度算术校准，避免模型返回互相矛盾的总分
+7. 主教练的依据与建议必须关联实际 `issue.category`，不允许凭空制造弱项
 
 ### 💾 双重记忆机制
 
@@ -175,7 +178,28 @@ python AILab_AgentIELTSTestPreparation.py
 python -m unittest discover -s tests -v
 ```
 
-这些测试不调用模型 API，覆盖 0.5 分档、原文引用、薄弱项来源和综合分校准。
+这些测试不调用模型 API，覆盖分数校准、原文引用、薄弱项来源、建议证据关联和评测集契约。
+
+---
+
+## 自动评测
+
+`evals/cases.json` 提供 12 条固定回答，低、中、高三个质量等级各 4 条。每条记录包含预期文本分数区间；低质量回答还标注专项考官必须召回的问题类别。
+
+真实模型评测是显式运行的，默认只执行 3 条，避免意外产生大量 API 费用：
+
+```powershell
+$env:DASHSCOPE_API_KEY = "你的DashScope API密钥"
+python -m evals.run_model_evals --limit 3
+```
+
+也可以只运行指定样例：
+
+```bash
+python -m evals.run_model_evals --case-id low_place_01 --case-id high_place_01
+```
+
+GitHub Actions 只运行免费的确定性单元测试，不会读取 API Key 或调用模型。
 
 ---
 
@@ -212,8 +236,8 @@ python -m unittest discover -s tests -v
 ├── ⏱️ 交互数据（耗时 + 词数，不作为口语流利度证据）
 ├── 🔎 可展示、可核查的评分依据
 ├── 📊 回答文本综合分
-├── 📝 语法维度诊断（精简版）
-├── 📚 词汇维度诊断（精简版）
+├── 📝 完整结构化语法诊断
+├── 📚 完整结构化词汇诊断
 ├── 📅 下一步复习建议（🔴短期 / 🟡中期 / 🟢长期）
 ├── 💪 鼓励语
 └── 💾 长期记忆状态（文件路径 + 累计统计）
@@ -227,7 +251,9 @@ python -m unittest discover -s tests -v
 AgentLab/
 ├── AILab_AgentIELTSTestPreparation.py   # 主程序（雅思陪练系统）
 ├── evaluation_models.py                  # Pydantic 评估 schema 与证据校验
+├── evals/                                # 12 条固定样例 + 按需模型评测器
 ├── tests/                                # 无需调用真实模型的单元测试
+├── .github/workflows/tests.yml           # PR / main 自动测试
 ├── requirements.txt                      # Python 依赖
 ├── Qiuyi_ielts_profile.json              # 长期记忆文件（运行后自动生成）
 ├── Agent_Architecture.png                # LangGraph 架构图
@@ -282,6 +308,7 @@ class AgentState(TypedDict):
     coach_result: dict                         # 通过 schema 校验的综合结果
     elapsed_time: float                       # 答题耗时（秒）
     estimated_score: float                    # 回答文本综合分
+    profile_path: str                         # 长期记忆路径；自动评测时可隔离
     phase: str                                # 当前阶段标识
     available_questions: list                 # 剩余题库索引（跨轮次传递）
 ```

@@ -40,13 +40,18 @@ Interactive IELTS Answer Practice & Text Assessment System
         run_practice_round() 通过参数接收并通过返回值传回更新后的列表，
         examiner_node 使用 list.remove(chosen_idx) 真正剔除已用题目。
   新增：题库耗尽时优雅提示，允许用户选择重置或退出。
+
+【v4.1 评分可信度更新】
+  EVAL:      新增 12 条低/中/高质量固定评测样例与按需模型评测器
+  CALIBRATE: 专项总分由子维度确定性计算，主教练总分采用 half-up 0.5 分档
+  ALIGNMENT: 主教练依据和建议必须关联真实 issue.category，不一致时自动重试
+  CI:        GitHub Actions 在 push/PR 时自动运行免费离线测试
 ================================================================================
 """
 
 import os
 import json
 import time
-import re
 import random
 from typing import TypedDict, Annotated
 from datetime import datetime
@@ -64,6 +69,7 @@ from evaluation_models import (
     GrammarEvaluation,
     VocabularyEvaluation,
     collect_weaknesses,
+    find_coach_alignment_errors,
     find_ungrounded_quotes,
 )
 
@@ -359,6 +365,7 @@ class AgentState(TypedDict):
     estimated_score: float
     phase: str
     question_start_time: float
+    profile_path: str
     available_questions: list   # 【v3.1】跨轮次的剩余题库索引池，examiner用remove()真剔除
 
 
@@ -393,6 +400,54 @@ def invoke_grounded_evaluation(schema, messages: list, answer: str):
     raise ValueError(f"模型连续返回非原文引用：{invalid_quotes}")
 
 
+def invoke_aligned_coach(
+    messages: list,
+    grammar: GrammarEvaluation,
+    vocabulary: VocabularyEvaluation,
+) -> CoachEvaluation:
+    """Retry coach output when scores or advice contradict specialist evidence."""
+    structured_model = model.with_structured_output(
+        CoachEvaluation,
+        method="function_calling",
+    )
+    retry_messages = list(messages)
+
+    for attempt in range(2):
+        result = structured_model.invoke(retry_messages)
+        alignment_errors = find_coach_alignment_errors(
+            result,
+            grammar,
+            vocabulary,
+        )
+        if not alignment_errors:
+            return result
+
+        if attempt == 0:
+            retry_messages.extend([
+                AIMessage(content=result.model_dump_json(ensure_ascii=False)),
+                HumanMessage(content=(
+                    "上一次综合评估与专项证据不一致："
+                    f"{alignment_errors}。请重新生成。语法/词汇分数必须与专项"
+                    "结果相同；issue 类型建议和评分依据只能引用实际出现的"
+                    " issue.category，并覆盖所有已发现类别。"
+                )),
+            ])
+
+    raise ValueError(f"主教练连续返回不一致结果：{alignment_errors}")
+
+
+def deterministic_issue_summary(result: GrammarEvaluation | VocabularyEvaluation) -> str:
+    """Describe issue counts without trusting potentially contradictory prose."""
+    if not result.issues:
+        return "未发现需要纠正的明确问题。"
+    major_count = sum(issue.severity == "major" for issue in result.issues)
+    minor_count = len(result.issues) - major_count
+    return (
+        f"共发现 {len(result.issues)} 项问题"
+        f"（major: {major_count}, minor: {minor_count}）。"
+    )
+
+
 def render_grammar_feedback(result: GrammarEvaluation) -> str:
     lines = ["## 📝 语法分析报告", "", "### ❌ 发现的语法问题："]
     if result.issues:
@@ -418,7 +473,7 @@ def render_grammar_feedback(result: GrammarEvaluation) -> str:
         f"- 语法准确性：{result.accuracy_score}/9",
         f"- 语法多样性：{result.range_score}/9",
         f"- 语法维度综合预估分：{result.score}/9",
-        f"- 评语：{result.summary}",
+        f"- 评语：{deterministic_issue_summary(result)}",
     ])
     return "\n".join(lines)
 
@@ -468,7 +523,7 @@ def render_vocab_feedback(result: VocabularyEvaluation) -> str:
         f"- 词汇多样性：{result.diversity_score}/9",
         f"- 词汇准确性：{result.accuracy_score}/9",
         f"- 词汇维度综合预估分：{result.score}/9",
-        f"- 评语：{result.summary}",
+        f"- 评语：{deterministic_issue_summary(result)}",
     ])
     return "\n".join(lines)
 
@@ -487,7 +542,7 @@ def render_coach_feedback(result: CoachEvaluation) -> str:
         "",
         "### 🔎 评分依据",
         *[
-            f"{index}. {item}"
+            f"{index}. {item.claim}"
             for index, item in enumerate(result.evidence_summary, 1)
         ],
         "",
@@ -496,60 +551,26 @@ def render_coach_feedback(result: CoachEvaluation) -> str:
         "### 📋 分阶段复习建议",
         "",
         "**🔴 短期（1周内）：**",
-        *[f"{index}. {item}" for index, item in enumerate(plan.short_term, 1)],
+        *[
+            f"{index}. {item.action}"
+            for index, item in enumerate(plan.short_term, 1)
+        ],
         "",
         "**🟡 中期（1个月）：**",
-        *[f"{index}. {item}" for index, item in enumerate(plan.medium_term, 1)],
+        *[
+            f"{index}. {item.action}"
+            for index, item in enumerate(plan.medium_term, 1)
+        ],
         "",
         "**🟢 长期（3个月）：**",
-        *[f"{index}. {item}" for index, item in enumerate(plan.long_term, 1)],
+        *[
+            f"{index}. {item.action}"
+            for index, item in enumerate(plan.long_term, 1)
+        ],
         "",
         f"### 💪 鼓励语\n{result.encouragement}",
     ]
     return "\n".join(lines)
-
-def extract_concise_feedback(full_text: str, max_chars: int = 450) -> str:
-    """
-    从考官的长篇反馈中提取精简版摘要。
-    优先保留评分行、❌/✅ 标记行、表格数据（最多5行）。
-    如果提取内容过短，退回使用前 max_chars 字符。
-    """
-    if not full_text:
-        return "(无反馈)"
-
-    lines = full_text.split("\n")
-    result_lines = []
-    table_rows = 0
-
-    for line in lines:
-        stripped = line.strip()
-        # 评分行：总是保留
-        if re.search(r'(综合预估分|预估.*分|X\.\d/9)', stripped):
-            result_lines.append(line)
-        # 错误/亮点标记行
-        elif re.match(r'^\d+\.\s*(❌|✅|\*\*)', stripped):
-            result_lines.append(line)
-        # 错误类型标记：1. [时态] — 原文：... → 建议：...
-        elif re.match(r'^\d+\.\s*\[.*?\]', stripped):
-            result_lines.append(line)
-        # 表格标题和分隔行
-        elif '| 序号 |' in stripped or '|------|' in stripped:
-            result_lines.append(line)
-        # 表格数据行（最多 5 行）
-        elif stripped.startswith('|') and '|' in stripped[1:]:
-            if table_rows < 5:
-                result_lines.append(line)
-                table_rows += 1
-
-    result = "\n".join(result_lines)
-
-    if len(result) < 100:
-        result = full_text[:max_chars]
-        if len(full_text) > max_chars:
-            result += "\n  ... (完整诊断见各考官原始报告)"
-
-    return result
-
 
 # ============================================================================
 # 第6部分：各 Agent 的 System Prompt 和节点函数
@@ -849,7 +870,11 @@ HEAD_COACH_SYSTEM_PROMPT = """你是雅思回答文本的综合教练。
 4. text_based_overall_score 是语法、词汇、文本连贯性三项的算术平均值，
    四舍五入到最近的 0.5 分。
 5. 所有分数使用 0.5 分档，依据必须简洁、可展示，不输出内部思维过程。
-6. 建议必须具体、可执行，并与专项考官发现的问题一致。"""
+6. grammar_score 和 vocabulary_score 必须分别等于专项考官的 score。
+7. issue 类型的建议必须通过 related_issue_categories 引用真实出现的
+   issue.category；strength 类型建议不得伪造问题类别。
+8. evidence_summary 和复习建议合计必须覆盖所有已发现的问题类别。
+9. 建议必须具体、可执行，并与专项考官发现的问题一致。"""
 
 
 def head_coach_node(state: AgentState) -> dict:
@@ -868,7 +893,7 @@ def head_coach_node(state: AgentState) -> dict:
 
     # ---- 读取长期记忆 ----
     print("\n  📖 读取长期记忆文件...")
-    profile = load_long_term_memory()
+    profile = load_long_term_memory(state.get("profile_path", "Qiuyi_ielts_profile.json"))
 
     sessions = [
         session
@@ -920,14 +945,14 @@ def head_coach_node(state: AgentState) -> dict:
 
 请返回符合 CoachEvaluation schema 的结果。"""
 
-    structured_model = model.with_structured_output(
-        CoachEvaluation,
-        method="function_calling",
+    result = invoke_aligned_coach(
+        [
+            SystemMessage(content=HEAD_COACH_SYSTEM_PROMPT),
+            HumanMessage(content=coach_prompt),
+        ],
+        grammar_result,
+        vocab_result,
     )
-    result = structured_model.invoke([
-        SystemMessage(content=HEAD_COACH_SYSTEM_PROMPT),
-        HumanMessage(content=coach_prompt),
-    ])
     feedback = render_coach_feedback(result)
     estimated_score = result.text_based_overall_score
 
@@ -964,9 +989,6 @@ def output_node(state: AgentState) -> dict:
     word_count = len(user_answer.split()) if user_answer else 0
     score = state["estimated_score"]
 
-    grammar_concise = extract_concise_feedback(grammar_fb)
-    vocab_concise = extract_concise_feedback(vocab_fb)
-
     print("\n")
     print("=" * 65)
     print("    🎯 本轮雅思回答文本评估报告")
@@ -982,22 +1004,22 @@ def output_node(state: AgentState) -> dict:
 
     print(f"\n  【🔎 评分依据】")
     for index, item in enumerate(coach_result.evidence_summary, 1):
-        print(f"     {index}. {item}")
+        print(f"     {index}. {item.claim}")
 
     print(f"\n  【📊 回答文本综合分】 {score} / 9")
     print("     已评估：语法、词汇、文本连贯性")
     print("     未评估：发音、真实口语流利度（需要音频证据）")
 
     print(f"\n  {'─' * 55}")
-    print(f"  【📝 语法维度诊断】(精简版 — 完整内容见上方输出)")
+    print(f"  【📝 语法维度诊断】")
     print(f"  {'─' * 55}")
-    for line in grammar_concise.split("\n"):
+    for line in grammar_fb.split("\n"):
         print(f"     {line}")
 
     print(f"\n  {'─' * 55}")
-    print(f"  【📚 词汇维度诊断】(精简版 — 完整内容见上方输出)")
+    print(f"  【📚 词汇维度诊断】")
     print(f"  {'─' * 55}")
-    for line in vocab_concise.split("\n"):
+    for line in vocab_fb.split("\n"):
         print(f"     {line}")
 
     print(f"\n  {'─' * 55}")
@@ -1011,7 +1033,7 @@ def output_node(state: AgentState) -> dict:
     ]:
         print(f"     {label}：")
         for index, item in enumerate(items, 1):
-            print(f"       {index}. {item}")
+            print(f"       {index}. {item.action}")
 
     print(f"\n  【💪】 {coach_result.encouragement}")
 
@@ -1036,7 +1058,7 @@ def output_node(state: AgentState) -> dict:
 
     result = update_profile_tool.invoke({
         "profile_json": json.dumps(profile_update, ensure_ascii=False),
-        "profile_path": "Qiuyi_ielts_profile.json",
+        "profile_path": state.get("profile_path", "Qiuyi_ielts_profile.json"),
     })
 
     print(f"\n  【💾 长期记忆状态】")
@@ -1140,6 +1162,7 @@ def run_practice_round(graph, config: dict, round_num: int, available_questions:
         "estimated_score": 0.0,
         "phase": "init",
         "question_start_time": 0.0,
+        "profile_path": "Qiuyi_ielts_profile.json",
         "available_questions": available_questions,  # 【v3.1】跨轮次剩余题库池
     }
 
@@ -1207,7 +1230,7 @@ def main():
     """主入口：构建图 → 循环练习 → 长期记忆持续累积。"""
     print("\n")
     print("🎓" * 33)
-    print("      交互式雅思回答陪练与文本评估系统  v4")
+    print("      交互式雅思回答陪练与文本评估系统  v4.1")
     print("      Interactive IELTS Answer Practice & Text Assessment")
     print("🎓" * 33)
     print()

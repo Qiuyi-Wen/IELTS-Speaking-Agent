@@ -1,0 +1,76 @@
+"""Contracts and deterministic checks for model-evaluation observations."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from pydantic import BaseModel, Field, model_validator
+
+from evaluation_models import IssueCategory
+
+
+class EvalCase(BaseModel):
+    id: str = Field(min_length=1)
+    level: str = Field(pattern=r"^(low|mid|high)$")
+    question: str = Field(min_length=1)
+    answer: str = Field(min_length=1)
+    expected_score_min: float = Field(ge=0, le=9)
+    expected_score_max: float = Field(ge=0, le=9)
+    required_issue_categories: list[IssueCategory] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_score_range(self):
+        if self.expected_score_min > self.expected_score_max:
+            raise ValueError("expected_score_min cannot exceed expected_score_max")
+        return self
+
+
+class EvalObservation(BaseModel):
+    score: float = Field(ge=0, le=9)
+    issue_categories: list[IssueCategory] = Field(default_factory=list)
+
+
+class EvalOutcome(BaseModel):
+    case_id: str
+    passed: bool
+    failures: list[str] = Field(default_factory=list)
+    observation: EvalObservation
+
+
+def load_eval_cases(path: Path | None = None) -> list[EvalCase]:
+    cases_path = path or Path(__file__).with_name("cases.json")
+    raw_cases = json.loads(cases_path.read_text(encoding="utf-8"))
+    cases = [EvalCase.model_validate(case) for case in raw_cases]
+    ids = [case.id for case in cases]
+    if len(ids) != len(set(ids)):
+        raise ValueError("evaluation case IDs must be unique")
+    return cases
+
+
+def evaluate_observation(
+    case: EvalCase,
+    observation: EvalObservation,
+) -> EvalOutcome:
+    failures: list[str] = []
+    if not case.expected_score_min <= observation.score <= case.expected_score_max:
+        failures.append(
+            f"score {observation.score} outside expected range "
+            f"{case.expected_score_min}-{case.expected_score_max}"
+        )
+
+    missing_categories = set(case.required_issue_categories) - set(
+        observation.issue_categories
+    )
+    if missing_categories:
+        failures.append(
+            "missing required issue categories: "
+            + ", ".join(sorted(missing_categories))
+        )
+
+    return EvalOutcome(
+        case_id=case.id,
+        passed=not failures,
+        failures=failures,
+        observation=observation,
+    )

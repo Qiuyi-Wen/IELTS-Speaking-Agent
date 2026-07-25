@@ -7,13 +7,32 @@ in an exact quote from the learner's answer.
 
 from __future__ import annotations
 
-from typing import Iterable, Literal
+import math
+from typing import Iterable, Literal, TypeAlias
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+IssueCategory: TypeAlias = Literal[
+    "时态",
+    "主谓一致",
+    "冠词",
+    "介词",
+    "句子结构",
+    "从句",
+    "语态",
+    "代词指代",
+    "拼写",
+    "词汇准确性",
+    "搭配",
+    "词汇多样性",
+    "同义改写",
+    "话题词汇",
+]
+
+
 class FeedbackIssue(BaseModel):
-    category: str = Field(min_length=1)
+    category: IssueCategory
     severity: Literal["minor", "major"]
     quote: str = Field(min_length=1)
     suggestion: str = Field(min_length=1)
@@ -51,6 +70,11 @@ class GrammarEvaluation(ScoredEvaluation):
     def require_half_band_dimension_score(cls, value: float) -> float:
         return ScoredEvaluation.require_half_band_score(value)
 
+    @model_validator(mode="after")
+    def calibrate_score_from_dimensions(self):
+        self.score = half_band_mean(self.accuracy_score, self.range_score)
+        return self
+
 
 class VocabularyEvaluation(ScoredEvaluation):
     diversity_score: float = Field(ge=0, le=9)
@@ -63,11 +87,42 @@ class VocabularyEvaluation(ScoredEvaluation):
     def require_half_band_dimension_score(cls, value: float) -> float:
         return ScoredEvaluation.require_half_band_score(value)
 
+    @model_validator(mode="after")
+    def calibrate_score_from_dimensions(self):
+        self.score = half_band_mean(self.diversity_score, self.accuracy_score)
+        return self
+
+
+class EvidenceItem(BaseModel):
+    claim: str = Field(min_length=1)
+    related_issue_categories: list[IssueCategory] = Field(default_factory=list)
+
+
+class Recommendation(BaseModel):
+    action: str = Field(min_length=1)
+    basis: Literal["issue", "strength"]
+    related_issue_categories: list[IssueCategory] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_basis_links(self):
+        if self.basis == "issue" and not self.related_issue_categories:
+            raise ValueError(
+                "issue-based recommendations must reference an issue category"
+            )
+        if self.basis == "strength" and self.related_issue_categories:
+            raise ValueError(
+                "strength-building recommendations cannot reference issue categories"
+            )
+        return self
+
 
 class ReviewPlan(BaseModel):
-    short_term: list[str] = Field(default_factory=list)
-    medium_term: list[str] = Field(default_factory=list)
-    long_term: list[str] = Field(default_factory=list)
+    short_term: list[Recommendation] = Field(default_factory=list)
+    medium_term: list[Recommendation] = Field(default_factory=list)
+    long_term: list[Recommendation] = Field(default_factory=list)
+
+    def all_recommendations(self) -> list[Recommendation]:
+        return self.short_term + self.medium_term + self.long_term
 
 
 class CoachEvaluation(BaseModel):
@@ -75,7 +130,7 @@ class CoachEvaluation(BaseModel):
     vocabulary_score: float = Field(ge=0, le=9)
     coherence_score: float = Field(ge=0, le=9)
     text_based_overall_score: float = Field(ge=0, le=9)
-    evidence_summary: list[str] = Field(min_length=1)
+    evidence_summary: list[EvidenceItem] = Field(min_length=1)
     history_comparison: str
     review_plan: ReviewPlan
     encouragement: str = Field(min_length=1)
@@ -95,22 +150,21 @@ class CoachEvaluation(BaseModel):
 
     @model_validator(mode="after")
     def validate_text_score_and_boundaries(self):
-        expected = round(
-            (
-                self.grammar_score
-                + self.vocabulary_score
-                + self.coherence_score
-            )
-            / 3
-            * 2
-        ) / 2
-        if self.text_based_overall_score != expected:
-            raise ValueError(
-                "text_based_overall_score must be the half-band rounded mean "
-                "of grammar, vocabulary, and coherence scores"
-            )
+        self.text_based_overall_score = half_band_mean(
+            self.grammar_score,
+            self.vocabulary_score,
+            self.coherence_score,
+        )
         self.unsupported_dimensions = ["pronunciation", "spoken_fluency"]
         return self
+
+
+def half_band_mean(*scores: float) -> float:
+    """Return an arithmetic mean rounded to the nearest IELTS half band."""
+    if not scores:
+        raise ValueError("at least one score is required")
+    doubled_mean = sum(scores) / len(scores) * 2
+    return math.floor(doubled_mean + 0.5) / 2
 
 
 def find_ungrounded_quotes(
@@ -136,3 +190,51 @@ def collect_weaknesses(
             if issue.category not in weaknesses:
                 weaknesses.append(issue.category)
     return weaknesses
+
+
+def find_coach_alignment_errors(
+    coach: CoachEvaluation,
+    grammar: GrammarEvaluation,
+    vocabulary: VocabularyEvaluation,
+) -> list[str]:
+    """Find coach claims or actions that are not backed by specialist issues."""
+    errors: list[str] = []
+    if coach.grammar_score != grammar.score:
+        errors.append(
+            f"coach grammar score {coach.grammar_score} != specialist {grammar.score}"
+        )
+    if coach.vocabulary_score != vocabulary.score:
+        errors.append(
+            "coach vocabulary score "
+            f"{coach.vocabulary_score} != specialist {vocabulary.score}"
+        )
+
+    observed_categories = {
+        issue.category for issue in grammar.issues + vocabulary.issues
+    }
+    linked_categories: set[str] = set()
+
+    for evidence in coach.evidence_summary:
+        for category in evidence.related_issue_categories:
+            linked_categories.add(category)
+            if category not in observed_categories:
+                errors.append(
+                    f"evidence references unobserved issue category: {category}"
+                )
+
+    for recommendation in coach.review_plan.all_recommendations():
+        for category in recommendation.related_issue_categories:
+            linked_categories.add(category)
+            if category not in observed_categories:
+                errors.append(
+                    f"recommendation references unobserved issue category: {category}"
+                )
+
+    missing_categories = observed_categories - linked_categories
+    if missing_categories:
+        errors.append(
+            "specialist issues missing from coach evidence/recommendations: "
+            + ", ".join(sorted(missing_categories))
+        )
+
+    return errors
