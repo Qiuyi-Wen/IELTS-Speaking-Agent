@@ -1,8 +1,9 @@
 """Validated data contracts for text-based IELTS feedback.
 
 These models deliberately exclude pronunciation and spoken fluency: neither can
-be assessed from a typed answer.  They also keep every reported issue grounded
-in an exact quote from the learner's answer.
+be assessed from a typed answer. They also keep every reported issue grounded
+in the learner's answer, tolerating only surrounding whitespace and terminal
+punctuation differences.
 """
 
 from __future__ import annotations
@@ -177,13 +178,26 @@ def find_ungrounded_quotes(
     answer: str,
     *evaluations: GrammarEvaluation | VocabularyEvaluation,
 ) -> list[str]:
-    """Return model-produced source quotes that are not exact answer substrings."""
+    """Return quotes not grounded in the answer, ignoring edge punctuation only."""
     candidates: list[str] = []
     for evaluation in evaluations:
         candidates.extend(issue.quote for issue in evaluation.issues)
         if isinstance(evaluation, VocabularyEvaluation):
             candidates.extend(upgrade.source_quote for upgrade in evaluation.upgrades)
-    return [quote for quote in candidates if quote not in answer]
+    return [quote for quote in candidates if not is_grounded_quote(answer, quote)]
+
+
+def is_grounded_quote(answer: str, quote: str) -> bool:
+    """Allow surrounding whitespace or sentence-final punctuation, not rewrites."""
+    stripped_quote = quote.strip()
+    if stripped_quote in answer:
+        return True
+
+    without_terminal_punctuation = stripped_quote.rstrip(".,!?;:，。！？；：")
+    return bool(
+        without_terminal_punctuation
+        and without_terminal_punctuation in answer
+    )
 
 
 def collect_weaknesses(

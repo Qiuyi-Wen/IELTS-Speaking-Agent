@@ -2,7 +2,9 @@
 
 `cases.json` contains 12 fixed text answers across low, mid, and high quality
 levels. Each case defines an expected text-score range and, for deliberately
-incorrect answers, issue categories that the specialist judges should detect.
+incorrect answers, unambiguous issue categories that the specialist judges
+should detect. Ambiguous errors can use category groups, where detecting any
+member satisfies the expectation.
 
 The deterministic test suite validates the dataset and comparison logic without
 calling a model:

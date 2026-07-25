@@ -15,6 +15,7 @@ from evaluation_models import (
     find_coach_alignment_errors,
     find_ungrounded_quotes,
     half_band_mean,
+    is_grounded_quote,
 )
 
 
@@ -54,7 +55,7 @@ class EvaluationModelTests(unittest.TestCase):
     def test_half_band_ties_round_up(self):
         self.assertEqual(half_band_mean(6.0, 6.5), 6.5)
 
-    def test_quotes_must_be_exact_answer_substrings(self):
+    def test_rewritten_quotes_are_rejected(self):
         answer = "The tree are very green."
         grammar = grammar_evaluation(
             issues=[
@@ -96,6 +97,27 @@ class EvaluationModelTests(unittest.TestCase):
             ]
         )
         self.assertEqual(find_ungrounded_quotes(answer, grammar, vocabulary), [])
+
+    def test_terminal_punctuation_difference_is_grounded(self):
+        answer = (
+            "Because his help, I become more confidence "
+            "and I want be a teacher too."
+        )
+        self.assertTrue(
+            is_grounded_quote(
+                answer,
+                "  Because his help, I become more confidence.  ",
+            )
+        )
+
+    def test_changed_quote_text_is_not_grounded(self):
+        answer = "Because his help, I become more confidence."
+        self.assertFalse(
+            is_grounded_quote(
+                answer,
+                "Because his support, I become more confident.",
+            )
+        )
 
     def test_weaknesses_come_only_from_explicit_issues(self):
         grammar = grammar_evaluation(

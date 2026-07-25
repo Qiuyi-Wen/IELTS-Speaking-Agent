@@ -19,11 +19,16 @@ class EvalCase(BaseModel):
     expected_score_min: float = Field(ge=0, le=9)
     expected_score_max: float = Field(ge=0, le=9)
     required_issue_categories: list[IssueCategory] = Field(default_factory=list)
+    required_issue_category_groups: list[list[IssueCategory]] = Field(
+        default_factory=list
+    )
 
     @model_validator(mode="after")
     def validate_score_range(self):
         if self.expected_score_min > self.expected_score_max:
             raise ValueError("expected_score_min cannot exceed expected_score_max")
+        if any(not group for group in self.required_issue_category_groups):
+            raise ValueError("required issue category groups cannot be empty")
         return self
 
 
@@ -69,6 +74,14 @@ def evaluate_observation(
             "missing required issue categories: "
             + ", ".join(sorted(missing_categories))
         )
+
+    observed_categories = set(observation.issue_categories)
+    for group in case.required_issue_category_groups:
+        if not observed_categories.intersection(group):
+            failures.append(
+                "missing required issue category group: "
+                + " | ".join(group)
+            )
 
     return EvalOutcome(
         case_id=case.id,

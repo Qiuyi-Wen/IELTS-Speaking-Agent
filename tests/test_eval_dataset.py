@@ -36,7 +36,7 @@ class EvalDatasetTests(unittest.TestCase):
             case,
             EvalObservation(
                 score=5.0,
-                issue_categories=["时态", "主谓一致", "句子结构"],
+                issue_categories=["时态", "主谓一致", "搭配"],
             ),
         )
         self.assertTrue(outcome.passed)
@@ -49,7 +49,38 @@ class EvalDatasetTests(unittest.TestCase):
             EvalObservation(score=8.0, issue_categories=[]),
         )
         self.assertFalse(outcome.passed)
-        self.assertEqual(len(outcome.failures), 2)
+        self.assertEqual(len(outcome.failures), 3)
+
+    def test_alternative_issue_category_group_accepts_any_member(self):
+        case = next(
+            case for case in load_eval_cases()
+            if case.id == "low_technology_01"
+        )
+        outcome = evaluate_observation(
+            case,
+            EvalObservation(
+                score=4.5,
+                issue_categories=["句子结构", "介词"],
+            ),
+        )
+        self.assertTrue(outcome.passed)
+
+    def test_alternative_issue_category_group_reports_when_none_match(self):
+        case = next(
+            case for case in load_eval_cases()
+            if case.id == "low_technology_01"
+        )
+        outcome = evaluate_observation(
+            case,
+            EvalObservation(
+                score=4.5,
+                issue_categories=["句子结构"],
+            ),
+        )
+        self.assertEqual(
+            outcome.failures,
+            ["missing required issue category group: 冠词 | 介词"],
+        )
 
     def test_case_failure_does_not_stop_later_cases(self):
         cases = load_eval_cases()[:3]

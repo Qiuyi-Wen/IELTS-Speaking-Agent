@@ -6,7 +6,8 @@
     "answer": "I want talk about park near my home. I go there yesterday and it have many tree. The people is quiet and nobody disturb me. I very like this place because it make me relax.",
     "expected_score_min": 3.5,
     "expected_score_max": 5.5,
-    "required_issue_categories": ["时态", "主谓一致", "句子结构"]
+    "required_issue_categories": ["时态", "主谓一致"],
+    "required_issue_category_groups": [["句子结构", "搭配"]]
   },
   {
     "id": "low_person_01",
@@ -24,7 +25,8 @@
     "answer": "It is my phone. I use every day for watch video and talk my friend. It very useful. Before I buy it, my life is difficult, but now I can finding everything in internet.",
     "expected_score_min": 3.5,
     "expected_score_max": 5.5,
-    "required_issue_categories": ["冠词", "介词", "句子结构"]
+    "required_issue_categories": ["句子结构"],
+    "required_issue_category_groups": [["冠词", "介词"]]
   },
   {
     "id": "low_waiting_01",
