@@ -153,6 +153,15 @@ class EvaluationModelTests(unittest.TestCase):
                 related_issue_categories=[],
             )
 
+    def test_linked_strength_recommendation_is_normalized_to_issue(self):
+        recommendation = Recommendation(
+            action="Build more topic vocabulary.",
+            basis="strength",
+            related_issue_categories=["话题词汇"],
+        )
+        self.assertEqual(recommendation.basis, "issue")
+        self.assertEqual(recommendation.related_issue_categories, ["话题词汇"])
+
     def test_coach_cannot_reference_unobserved_issue(self):
         grammar = grammar_evaluation(issues=[])
         vocabulary = vocabulary_evaluation(issues=[])

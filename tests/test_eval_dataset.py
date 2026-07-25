@@ -1,9 +1,11 @@
 import unittest
 
 from evals.evaluator import (
+    EvalOutcome,
     EvalObservation,
     evaluate_observation,
     load_eval_cases,
+    run_cases_resilient,
 )
 
 
@@ -48,6 +50,31 @@ class EvalDatasetTests(unittest.TestCase):
         )
         self.assertFalse(outcome.passed)
         self.assertEqual(len(outcome.failures), 2)
+
+    def test_case_failure_does_not_stop_later_cases(self):
+        cases = load_eval_cases()[:3]
+
+        def runner(case):
+            if case.id == cases[1].id:
+                raise ValueError("invalid model structure")
+            return EvalOutcome(
+                case_id=case.id,
+                passed=True,
+                observation=EvalObservation(
+                    score=case.expected_score_min,
+                    issue_categories=case.required_issue_categories,
+                ),
+            )
+
+        outcomes = list(run_cases_resilient(cases, runner))
+
+        self.assertEqual([outcome.case_id for outcome in outcomes], [
+            case.id for case in cases
+        ])
+        self.assertTrue(outcomes[0].passed)
+        self.assertFalse(outcomes[1].passed)
+        self.assertIn("invalid model structure", outcomes[1].error)
+        self.assertTrue(outcomes[2].passed)
 
 
 if __name__ == "__main__":

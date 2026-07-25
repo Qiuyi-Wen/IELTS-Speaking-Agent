@@ -29,6 +29,7 @@ from evals.evaluator import (  # noqa: E402
     EvalObservation,
     evaluate_observation,
     load_eval_cases,
+    run_cases_resilient,
 )
 
 
@@ -74,14 +75,19 @@ def main():
     else:
         selected = cases[: args.limit]
 
-    outcomes = [run_case(case) for case in selected]
-    payload = [outcome.model_dump() for outcome in outcomes]
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
-    if args.output:
-        args.output.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+    outcomes = []
+    for outcome in run_cases_resilient(selected, run_case):
+        outcomes.append(outcome)
+        print(json.dumps(outcome.model_dump(), ensure_ascii=False, indent=2))
+        if args.output:
+            args.output.write_text(
+                json.dumps(
+                    [item.model_dump() for item in outcomes],
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
 
     raise SystemExit(0 if all(outcome.passed for outcome in outcomes) else 1)
 

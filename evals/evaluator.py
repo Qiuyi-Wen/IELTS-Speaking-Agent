@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from collections.abc import Callable, Iterable, Iterator
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -35,7 +36,8 @@ class EvalOutcome(BaseModel):
     case_id: str
     passed: bool
     failures: list[str] = Field(default_factory=list)
-    observation: EvalObservation
+    observation: EvalObservation | None = None
+    error: str | None = None
 
 
 def load_eval_cases(path: Path | None = None) -> list[EvalCase]:
@@ -74,3 +76,21 @@ def evaluate_observation(
         failures=failures,
         observation=observation,
     )
+
+
+def run_cases_resilient(
+    cases: Iterable[EvalCase],
+    runner: Callable[[EvalCase], EvalOutcome],
+) -> Iterator[EvalOutcome]:
+    """Run every case and turn one case's exception into a failed outcome."""
+    for case in cases:
+        try:
+            yield runner(case)
+        except Exception as error:
+            message = f"{type(error).__name__}: {error}"
+            yield EvalOutcome(
+                case_id=case.id,
+                passed=False,
+                failures=[f"execution error: {message}"],
+                error=message,
+            )

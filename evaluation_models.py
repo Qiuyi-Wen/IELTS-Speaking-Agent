@@ -103,15 +103,21 @@ class Recommendation(BaseModel):
     basis: Literal["issue", "strength"]
     related_issue_categories: list[IssueCategory] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_basis_from_links(cls, data):
+        """Treat an explicit issue link as authoritative over the model's label."""
+        if isinstance(data, dict) and data.get("related_issue_categories"):
+            normalized = dict(data)
+            normalized["basis"] = "issue"
+            return normalized
+        return data
+
     @model_validator(mode="after")
     def validate_basis_links(self):
         if self.basis == "issue" and not self.related_issue_categories:
             raise ValueError(
                 "issue-based recommendations must reference an issue category"
-            )
-        if self.basis == "strength" and self.related_issue_categories:
-            raise ValueError(
-                "strength-building recommendations cannot reference issue categories"
             )
         return self
 

@@ -18,6 +18,15 @@ $env:DASHSCOPE_API_KEY = "your-key"
 python -m evals.run_model_evals --limit 3
 ```
 
+Persist results after every completed case:
+
+```powershell
+python -m evals.run_model_evals --limit 3 --output evals/results.json
+```
+
+One case's model or validation error is recorded as a failed outcome instead of
+stopping the remaining cases.
+
 Run specific cases:
 
 ```bash

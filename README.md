@@ -193,6 +193,14 @@ $env:DASHSCOPE_API_KEY = "你的DashScope API密钥"
 python -m evals.run_model_evals --limit 3
 ```
 
+需要保留逐条结果时，可指定输出文件：
+
+```powershell
+python -m evals.run_model_evals --limit 3 --output evals/results.json
+```
+
+评测器会在每条案例完成后立即打印并更新输出文件。单条模型输出校验失败会被记录为失败结果，后续案例仍会继续运行。
+
 也可以只运行指定样例：
 
 ```bash

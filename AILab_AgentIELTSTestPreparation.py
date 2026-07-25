@@ -63,6 +63,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import interrupt, Command
 from langchain_core.tools import tool
+from pydantic import ValidationError
 
 from evaluation_models import (
     CoachEvaluation,
@@ -413,7 +414,21 @@ def invoke_aligned_coach(
     retry_messages = list(messages)
 
     for attempt in range(2):
-        result = structured_model.invoke(retry_messages)
+        try:
+            result = structured_model.invoke(retry_messages)
+        except ValidationError as error:
+            if attempt == 0:
+                retry_messages.append(
+                    HumanMessage(content=(
+                        "上一次输出未通过 CoachEvaluation 结构校验。"
+                        f"校验错误：{error}。请修正字段后重新生成；"
+                        "有 related_issue_categories 的建议必须视为 issue 类型，"
+                        "issue 类型建议必须至少关联一个真实问题类别。"
+                    ))
+                )
+                continue
+            raise ValueError("主教练连续返回无法解析的结构化结果") from error
+
         alignment_errors = find_coach_alignment_errors(
             result,
             grammar,
