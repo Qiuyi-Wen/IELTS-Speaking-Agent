@@ -212,6 +212,41 @@ def collect_weaknesses(
     return weaknesses
 
 
+def complete_coach_issue_coverage(
+    coach: CoachEvaluation,
+    grammar: GrammarEvaluation,
+    vocabulary: VocabularyEvaluation,
+) -> CoachEvaluation:
+    """Deterministically add evidence for specialist categories the coach omitted."""
+    issues_by_category: dict[str, FeedbackIssue] = {}
+    for issue in grammar.issues + vocabulary.issues:
+        issues_by_category.setdefault(issue.category, issue)
+
+    linked_categories = {
+        category
+        for evidence in coach.evidence_summary
+        for category in evidence.related_issue_categories
+    }
+    linked_categories.update(
+        category
+        for recommendation in coach.review_plan.all_recommendations()
+        for category in recommendation.related_issue_categories
+    )
+
+    for category in sorted(set(issues_by_category) - linked_categories):
+        issue = issues_by_category[category]
+        coach.evidence_summary.append(
+            EvidenceItem(
+                claim=(
+                    f"专项考官发现{category}问题："
+                    f"“{issue.quote}”——{issue.explanation}"
+                ),
+                related_issue_categories=[issue.category],
+            )
+        )
+    return coach
+
+
 def find_coach_alignment_errors(
     coach: CoachEvaluation,
     grammar: GrammarEvaluation,

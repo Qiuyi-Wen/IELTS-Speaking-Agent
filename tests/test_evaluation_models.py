@@ -12,6 +12,7 @@ from evaluation_models import (
     VocabularyEvaluation,
     VocabularyUpgrade,
     collect_weaknesses,
+    complete_coach_issue_coverage,
     find_coach_alignment_errors,
     find_ungrounded_quotes,
     half_band_mean,
@@ -243,6 +244,71 @@ class EvaluationModelTests(unittest.TestCase):
                 "specialist issues missing from coach evidence/recommendations: "
                 "主谓一致"
             ],
+        )
+
+    def test_missing_coach_evidence_is_completed_from_specialist_issue(self):
+        grammar = grammar_evaluation(
+            issues=[
+                FeedbackIssue(
+                    category="语态",
+                    severity="minor",
+                    quote="is build",
+                    suggestion="is built",
+                    explanation="The passive form needs a past participle.",
+                )
+            ]
+        )
+        vocabulary = vocabulary_evaluation(issues=[])
+        coach = CoachEvaluation(
+            grammar_score=grammar.score,
+            vocabulary_score=vocabulary.score,
+            coherence_score=6.5,
+            text_based_overall_score=6.5,
+            evidence_summary=[EvidenceItem(claim="The response is understandable.")],
+            history_comparison="No history.",
+            review_plan=ReviewPlan(),
+            encouragement="Keep practising.",
+        )
+
+        completed = complete_coach_issue_coverage(coach, grammar, vocabulary)
+        evidence_count = len(completed.evidence_summary)
+        complete_coach_issue_coverage(completed, grammar, vocabulary)
+
+        self.assertEqual(
+            completed.evidence_summary[-1].related_issue_categories,
+            ["语态"],
+        )
+        self.assertIn("is build", completed.evidence_summary[-1].claim)
+        self.assertEqual(len(completed.evidence_summary), evidence_count)
+        self.assertEqual(
+            find_coach_alignment_errors(completed, grammar, vocabulary),
+            [],
+        )
+
+    def test_coverage_completion_does_not_hide_invented_coach_category(self):
+        grammar = grammar_evaluation(issues=[])
+        vocabulary = vocabulary_evaluation(issues=[])
+        coach = CoachEvaluation(
+            grammar_score=grammar.score,
+            vocabulary_score=vocabulary.score,
+            coherence_score=6.5,
+            text_based_overall_score=6.5,
+            evidence_summary=[
+                EvidenceItem(
+                    claim="There is a tense problem.",
+                    related_issue_categories=["时态"],
+                )
+            ],
+            history_comparison="No history.",
+            review_plan=ReviewPlan(),
+            encouragement="Keep practising.",
+        )
+
+        completed = complete_coach_issue_coverage(coach, grammar, vocabulary)
+
+        self.assertEqual(
+            find_coach_alignment_errors(completed, grammar, vocabulary),
+            ["evidence references unobserved issue category: 时态"],
         )
 
 

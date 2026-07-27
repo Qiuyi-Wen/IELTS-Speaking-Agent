@@ -44,7 +44,7 @@ Interactive IELTS Answer Practice & Text Assessment System
 【v4.1 评分可信度更新】
   EVAL:      新增 12 条低/中/高质量固定评测样例与按需模型评测器
   CALIBRATE: 专项总分由子维度确定性计算，主教练总分采用 half-up 0.5 分档
-  ALIGNMENT: 主教练依据和建议必须关联真实 issue.category，不一致时自动重试
+  ALIGNMENT: 禁止主教练虚构 issue.category，遗漏的真实类别由程序确定性补全
   CI:        GitHub Actions 在 push/PR 时自动运行免费离线测试
 ================================================================================
 """
@@ -70,6 +70,7 @@ from evaluation_models import (
     GrammarEvaluation,
     VocabularyEvaluation,
     collect_weaknesses,
+    complete_coach_issue_coverage,
     find_coach_alignment_errors,
     find_ungrounded_quotes,
 )
@@ -429,6 +430,11 @@ def invoke_aligned_coach(
                 continue
             raise ValueError("主教练连续返回无法解析的结构化结果") from error
 
+        result = complete_coach_issue_coverage(
+            result,
+            grammar,
+            vocabulary,
+        )
         alignment_errors = find_coach_alignment_errors(
             result,
             grammar,
@@ -444,7 +450,7 @@ def invoke_aligned_coach(
                     "上一次综合评估与专项证据不一致："
                     f"{alignment_errors}。请重新生成。语法/词汇分数必须与专项"
                     "结果相同；issue 类型建议和评分依据只能引用实际出现的"
-                    " issue.category，并覆盖所有已发现类别。"
+                    " issue.category，不得虚构类别。"
                 )),
             ])
 
@@ -888,7 +894,7 @@ HEAD_COACH_SYSTEM_PROMPT = """你是雅思回答文本的综合教练。
 6. grammar_score 和 vocabulary_score 必须分别等于专项考官的 score。
 7. issue 类型的建议必须通过 related_issue_categories 引用真实出现的
    issue.category；strength 类型建议不得伪造问题类别。
-8. evidence_summary 和复习建议合计必须覆盖所有已发现的问题类别。
+8. evidence_summary 和复习建议应优先覆盖最重要的问题；遗漏的真实类别由程序补全。
 9. 建议必须具体、可执行，并与专项考官发现的问题一致。"""
 
 
