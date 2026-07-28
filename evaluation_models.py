@@ -104,16 +104,6 @@ class Recommendation(BaseModel):
     basis: Literal["issue", "strength"]
     related_issue_categories: list[IssueCategory] = Field(default_factory=list)
 
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_basis_from_links(cls, data):
-        """Treat an explicit issue link as authoritative over the model's label."""
-        if isinstance(data, dict) and data.get("related_issue_categories"):
-            normalized = dict(data)
-            normalized["basis"] = "issue"
-            return normalized
-        return data
-
     @model_validator(mode="after")
     def validate_basis_links(self):
         if self.basis == "issue" and not self.related_issue_categories:
@@ -230,6 +220,7 @@ def complete_coach_issue_coverage(
     linked_categories.update(
         category
         for recommendation in coach.review_plan.all_recommendations()
+        if recommendation.basis == "issue"
         for category in recommendation.related_issue_categories
     )
 
@@ -278,6 +269,8 @@ def find_coach_alignment_errors(
                 )
 
     for recommendation in coach.review_plan.all_recommendations():
+        if recommendation.basis == "strength":
+            continue
         for category in recommendation.related_issue_categories:
             linked_categories.add(category)
             if category not in observed_categories:

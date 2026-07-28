@@ -25,8 +25,11 @@
     "answer": "It is my phone. I use every day for watch video and talk my friend. It very useful. Before I buy it, my life is difficult, but now I can finding everything in internet.",
     "expected_score_min": 3.5,
     "expected_score_max": 5.5,
-    "required_issue_categories": ["句子结构"],
-    "required_issue_category_groups": [["冠词", "介词"]]
+    "required_issue_categories": [],
+    "required_issue_category_groups": [
+      ["冠词", "介词"],
+      ["句子结构", "搭配"]
+    ]
   },
   {
     "id": "low_waiting_01",

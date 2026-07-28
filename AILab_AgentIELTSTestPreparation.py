@@ -893,7 +893,7 @@ HEAD_COACH_SYSTEM_PROMPT = """你是雅思回答文本的综合教练。
 5. 所有分数使用 0.5 分档，依据必须简洁、可展示，不输出内部思维过程。
 6. grammar_score 和 vocabulary_score 必须分别等于专项考官的 score。
 7. issue 类型的建议必须通过 related_issue_categories 引用真实出现的
-   issue.category；strength 类型建议不得伪造问题类别。
+   issue.category；strength 类型建议可以标注未来要发展的技能类别，但不代表弱项。
 8. evidence_summary 和复习建议应优先覆盖最重要的问题；遗漏的真实类别由程序补全。
 9. 建议必须具体、可执行，并与专项考官发现的问题一致。"""
 

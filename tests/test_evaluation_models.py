@@ -176,14 +176,83 @@ class EvaluationModelTests(unittest.TestCase):
                 related_issue_categories=[],
             )
 
-    def test_linked_strength_recommendation_is_normalized_to_issue(self):
+    def test_linked_strength_recommendation_remains_strength(self):
         recommendation = Recommendation(
             action="Build more topic vocabulary.",
             basis="strength",
             related_issue_categories=["话题词汇"],
         )
-        self.assertEqual(recommendation.basis, "issue")
+        self.assertEqual(recommendation.basis, "strength")
         self.assertEqual(recommendation.related_issue_categories, ["话题词汇"])
+
+    def test_strength_recommendations_may_reference_unobserved_skill_areas(self):
+        grammar = grammar_evaluation(issues=[])
+        vocabulary = vocabulary_evaluation(issues=[])
+        coach = CoachEvaluation(
+            grammar_score=grammar.score,
+            vocabulary_score=vocabulary.score,
+            coherence_score=6.5,
+            text_based_overall_score=6.5,
+            evidence_summary=[EvidenceItem(claim="The response is understandable.")],
+            history_comparison="No history.",
+            review_plan=ReviewPlan(
+                long_term=[
+                    Recommendation(
+                        action="Build more topic vocabulary.",
+                        basis="strength",
+                        related_issue_categories=["话题词汇", "词汇多样性"],
+                    )
+                ]
+            ),
+            encouragement="Keep practising.",
+        )
+        self.assertEqual(
+            find_coach_alignment_errors(coach, grammar, vocabulary),
+            [],
+        )
+
+    def test_strength_links_do_not_suppress_missing_issue_completion(self):
+        grammar = grammar_evaluation(issues=[])
+        vocabulary = vocabulary_evaluation(
+            issues=[
+                FeedbackIssue(
+                    category="搭配",
+                    severity="minor",
+                    quote="do a photo",
+                    suggestion="take a photo",
+                    explanation="Use the standard collocation.",
+                )
+            ]
+        )
+        coach = CoachEvaluation(
+            grammar_score=grammar.score,
+            vocabulary_score=vocabulary.score,
+            coherence_score=6.5,
+            text_based_overall_score=6.5,
+            evidence_summary=[EvidenceItem(claim="The response is understandable.")],
+            history_comparison="No history.",
+            review_plan=ReviewPlan(
+                long_term=[
+                    Recommendation(
+                        action="Keep building collocation range.",
+                        basis="strength",
+                        related_issue_categories=["搭配"],
+                    )
+                ]
+            ),
+            encouragement="Keep practising.",
+        )
+
+        completed = complete_coach_issue_coverage(coach, grammar, vocabulary)
+
+        self.assertEqual(
+            completed.evidence_summary[-1].related_issue_categories,
+            ["搭配"],
+        )
+        self.assertEqual(
+            find_coach_alignment_errors(completed, grammar, vocabulary),
+            [],
+        )
 
     def test_coach_cannot_reference_unobserved_issue(self):
         grammar = grammar_evaluation(issues=[])
