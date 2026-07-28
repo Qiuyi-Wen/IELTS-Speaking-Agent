@@ -29,9 +29,13 @@ jobs:
         run: >-
           python -m py_compile
           AILab_AgentIELTSTestPreparation.py
+          api.py
+          api_models.py
+          evaluation_service.py
           evaluation_models.py
           evals/evaluator.py
           evals/run_model_evals.py
+          tests/test_api.py
           tests/test_evaluation_models.py
           tests/test_eval_dataset.py
 

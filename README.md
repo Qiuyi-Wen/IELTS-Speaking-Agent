@@ -16,6 +16,7 @@
 - [环境要求](#环境要求)
 - [快速开始](#快速开始)
 - [自动评测](#自动评测)
+- [HTTP API](#http-api)
 - [使用说明](#使用说明)
 - [项目结构](#项目结构)
 - [Agent 工作流](#agent-工作流)
@@ -179,7 +180,8 @@ python AILab_AgentIELTSTestPreparation.py
 python -m unittest discover -s tests -v
 ```
 
-这些测试不调用模型 API，覆盖分数校准、原文引用、薄弱项来源、建议证据关联和评测集契约。
+这些测试不调用模型 API，覆盖分数校准、原文引用、薄弱项来源、建议证据关联、
+评测集契约、无状态服务和 HTTP 错误边界。
 
 ---
 
@@ -209,6 +211,43 @@ python -m evals.run_model_evals --case-id low_place_01 --case-id high_place_01
 ```
 
 GitHub Actions 只运行免费的确定性单元测试，不会读取 API Key 或调用模型。
+
+---
+
+## HTTP API
+
+FastAPI 服务复用与 CLI 相同的 Grammar Judge、Vocabulary Judge 和 Head Coach，
+但默认采用无状态模式：不会读取或写入个人长期记忆文件，也不会把 API Key
+返回给浏览器。
+
+启动服务：
+
+```powershell
+conda activate agent_lab
+$env:DASHSCOPE_API_KEY = "你的DashScope API密钥"
+python -m uvicorn api:app --reload
+```
+
+启动后可访问：
+
+- 健康检查：`http://127.0.0.1:8000/health`
+- Swagger 文档：`http://127.0.0.1:8000/docs`
+- 评估接口：`POST http://127.0.0.1:8000/api/v1/evaluate`
+
+请求示例：
+
+```json
+{
+  "question": "Describe a quiet place where you like to relax.",
+  "answer": "I would like to talk about a lake near my hometown..."
+}
+```
+
+接口只评估语法、词汇和文本连贯性。问题长度限制为 1000 个字符，回答长度限制为
+6000 个字符；无效输入返回 `422`，服务器未配置模型 Key 时返回 `503`，模型调用
+失败时返回不包含供应商异常细节的 `502`。
+
+`/health` 不需要 API Key，因此容器和部署平台可以在模型未配置时检查服务是否启动。
 
 ---
 
@@ -259,9 +298,12 @@ GitHub Actions 只运行免费的确定性单元测试，不会读取 API Key �
 ```
 AgentLab/
 ├── AILab_AgentIELTSTestPreparation.py   # 主程序（雅思陪练系统）
+├── api.py                                # FastAPI 路由与安全错误映射
+├── api_models.py                         # HTTP 请求/响应 Pydantic schema
+├── evaluation_service.py                 # CLI/API 共用的无状态评估服务
 ├── evaluation_models.py                  # Pydantic 评估 schema 与证据校验
 ├── evals/                                # 12 条固定样例 + 按需模型评测器
-├── tests/                                # 无需调用真实模型的单元测试
+├── tests/                                # 评估、服务与 API 单元测试
 ├── .github/workflows/tests.yml           # PR / main 自动测试
 ├── requirements.txt                      # Python 依赖
 ├── Qiuyi_ielts_profile.json              # 长期记忆文件（运行后自动生成）
@@ -409,19 +451,19 @@ update_profile_tool(
 
 ### Q: 可以更换模型吗？
 
-**A**: 可以。修改代码中的 `model` 配置即可——系统使用 OpenAI 兼容接口，支持任何兼容 `ChatOpenAI` 的模型服务端点。例如：
+**A**: 可以。修改 `get_model()` 中的惰性模型配置即可——系统使用 OpenAI 兼容接口，支持任何兼容 `ChatOpenAI` 的模型服务端点。例如：
 
 ```python
-model = ChatOpenAI(
-    model="qwen-plus",   # 换成更强模型
+return ChatOpenAI(
+    model="qwen-plus",
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-    api_key=API_KEY,
+    api_key=api_key,
     temperature=0.7,
 )
 ```
 
 ---
 
-**🤖 技术栈**：LangGraph · LangChain · qwen-turbo · DashScope API · Python
+**🤖 技术栈**：LangGraph · LangChain · FastAPI · qwen-turbo · DashScope API · Python
 
 **📧 作者**：Qiuyi Wen
