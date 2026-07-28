@@ -1,0 +1,115 @@
+[
+  {
+    "id": "low_place_01",
+    "level": "low",
+    "question": "Describe a quiet place where you like to relax.",
+    "answer": "I want talk about park near my home. I go there yesterday and it have many tree. The people is quiet and nobody disturb me. I very like this place because it make me relax.",
+    "expected_score_min": 3.5,
+    "expected_score_max": 5.5,
+    "required_issue_categories": ["时态", "主谓一致"],
+    "required_issue_category_groups": [["句子结构", "搭配"]]
+  },
+  {
+    "id": "low_person_01",
+    "level": "low",
+    "question": "Describe a person who has influenced your life.",
+    "answer": "My teacher influence me a lot. He teach me math when I am in middle school. He always tell me do not give up. Because his help, I become more confidence and I want be a teacher too.",
+    "expected_score_min": 3.5,
+    "expected_score_max": 5.5,
+    "required_issue_categories": ["时态", "主谓一致", "词汇准确性"]
+  },
+  {
+    "id": "low_technology_01",
+    "level": "low",
+    "question": "Describe an important piece of technology you use every day.",
+    "answer": "It is my phone. I use every day for watch video and talk my friend. It very useful. Before I buy it, my life is difficult, but now I can finding everything in internet.",
+    "expected_score_min": 3.5,
+    "expected_score_max": 5.5,
+    "required_issue_categories": [],
+    "required_issue_category_groups": [
+      ["冠词", "介词"],
+      ["句子结构", "搭配"]
+    ]
+  },
+  {
+    "id": "low_waiting_01",
+    "level": "low",
+    "question": "Describe a time when you had to wait for something important.",
+    "answer": "Last year I wait my university result for two week. I am very nervous every day. My parents tells me be patient, but I cannot slept well. Finally the result come and I was very happy.",
+    "expected_score_min": 4.0,
+    "expected_score_max": 5.5,
+    "required_issue_categories": ["时态", "介词", "主谓一致"]
+  },
+  {
+    "id": "mid_place_01",
+    "level": "mid",
+    "question": "Describe a place you have visited that you would like to return to.",
+    "answer": "I would like to talk about Dali, a small city in Yunnan Province. I visited it with my parents two years ago. We walked around the old town, tried some local food and cycled beside Erhai Lake. The scenery was beautiful and the atmosphere was quite relaxing. I would like to return because our first trip was too short, so there are still several villages and hiking routes that I have not explored.",
+    "expected_score_min": 6.0,
+    "expected_score_max": 7.5,
+    "required_issue_categories": []
+  },
+  {
+    "id": "mid_hobby_01",
+    "level": "mid",
+    "question": "Describe an unusual or interesting hobby.",
+    "answer": "My hobby is street photography. I started it during high school after borrowing my father's old camera. I usually walk around markets or railway stations and look for ordinary moments that tell a story. It helps me notice details that I normally ignore. However, I sometimes feel nervous about photographing strangers, so I am learning how to communicate politely before taking a picture.",
+    "expected_score_min": 6.0,
+    "expected_score_max": 7.5,
+    "required_issue_categories": []
+  },
+  {
+    "id": "mid_helping_01",
+    "level": "mid",
+    "question": "Describe a time when you helped someone learn something.",
+    "answer": "Last semester I helped my roommate prepare for a programming exam. At first, he tried to memorize every example, which was not very effective. I showed him how to divide each problem into smaller steps and asked him to explain his reasoning aloud. After a week, he became more confident and passed the exam. This experience taught me that teaching requires patience as well as technical knowledge.",
+    "expected_score_min": 6.0,
+    "expected_score_max": 7.5,
+    "required_issue_categories": []
+  },
+  {
+    "id": "mid_instrument_01",
+    "level": "mid",
+    "question": "Describe a musical instrument you enjoy playing.",
+    "answer": "I enjoy playing the acoustic guitar, which I began learning at university. I was attracted by its warm sound and the fact that it is easy to carry. I practise several times a week, mainly by following online lessons. Playing guitar gives me a break from academic pressure, although changing chords quickly is still challenging for me. In the future, I hope to perform a complete song for my friends.",
+    "expected_score_min": 6.0,
+    "expected_score_max": 7.5,
+    "required_issue_categories": []
+  },
+  {
+    "id": "high_person_01",
+    "level": "high",
+    "question": "Describe a person who has influenced your life.",
+    "answer": "The person who has shaped my outlook most profoundly is my secondary-school physics teacher. Rather than treating mistakes as evidence of limited ability, she framed them as useful clues about how we thought. When I struggled with mechanics, she asked questions that led me to identify my own assumptions instead of simply giving me the solution. Her approach gradually replaced my fear of failure with intellectual curiosity, and it still influences how I tackle unfamiliar technical problems today.",
+    "expected_score_min": 7.0,
+    "expected_score_max": 9.0,
+    "required_issue_categories": []
+  },
+  {
+    "id": "high_place_01",
+    "level": "high",
+    "question": "Describe a quiet place where you like to think.",
+    "answer": "A place I return to whenever I need to think clearly is a narrow path beside Dianchi Lake in Kunming. It is not a famous viewpoint, which is precisely why I value it: early in the morning, the only sounds are bicycle bells, water against the stones and the occasional call of a bird. Walking there gives my thoughts enough space to settle. I often arrive with a vague sense of anxiety and leave with a concrete list of decisions, so the place has become part of my way of solving problems.",
+    "expected_score_min": 7.0,
+    "expected_score_max": 9.0,
+    "required_issue_categories": []
+  },
+  {
+    "id": "high_technology_01",
+    "level": "high",
+    "question": "Describe an important piece of technology you use every day.",
+    "answer": "The technology I rely on most is a lightweight laptop that I use for studying, programming and organizing research notes. Its importance lies less in the device itself than in the continuity it provides: lecture materials, experiments and unfinished ideas remain accessible wherever I work. It has also changed my learning habits, because I can test a concept immediately rather than merely reading about it. The disadvantage is that work can follow me everywhere, so I deliberately keep the laptop closed during meals and before sleep.",
+    "expected_score_min": 7.0,
+    "expected_score_max": 9.0,
+    "required_issue_categories": []
+  },
+  {
+    "id": "high_waiting_01",
+    "level": "high",
+    "question": "Describe a time when you had to wait for something important.",
+    "answer": "One particularly memorable period of waiting came after I applied for a competitive university programme. The decision took nearly six weeks, and the uncertainty was more difficult than a straightforward rejection would have been. Initially, I refreshed my email constantly, but I eventually realized that this habit was exhausting and unproductive. I redirected my attention towards coursework and exercise, both of which gave structure to the days. When the offer finally arrived, I felt relieved, but I was equally grateful for having learned how to live with uncertainty.",
+    "expected_score_min": 7.0,
+    "expected_score_max": 9.0,
+    "required_issue_categories": []
+  }
+]
