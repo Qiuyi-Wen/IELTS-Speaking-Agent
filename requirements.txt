@@ -2,3 +2,6 @@ langchain-core
 langchain-openai
 langgraph
 pydantic>=2,<3
+fastapi
+uvicorn
+httpx

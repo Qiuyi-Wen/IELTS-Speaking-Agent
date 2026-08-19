@@ -38,7 +38,7 @@ def run_case(case):
         "current_question": case.question,
         "user_answer": case.answer,
         "timer_result": "离线评测：不使用交互耗时进行评分",
-        "profile_path": str(REPO_ROOT / "evals" / ".empty_profile.json"),
+        "profile_path": "",
     }
     state.update(grammar_judge_node(state))
     state.update(vocab_judge_node(state))

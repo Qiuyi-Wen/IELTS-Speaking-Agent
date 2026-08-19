@@ -1,6 +1,6 @@
 """
 ================================================================================
-AILab_AgentIELTSTestPreparation.py  (v2 — BUGFIX + UX 优化)
+AILab_AgentIELTSTestPreparation.py  (v5.0 — CLI + FastAPI 后端)
 交互式雅思口语模拟陪练与评估系统
 Interactive IELTS Answer Practice & Text Assessment System
 ================================================================================
@@ -46,6 +46,11 @@ Interactive IELTS Answer Practice & Text Assessment System
   CALIBRATE: 专项总分由子维度确定性计算，主教练总分采用 half-up 0.5 分档
   ALIGNMENT: 禁止主教练虚构 issue.category，遗漏的真实类别由程序确定性补全
   CI:        GitHub Actions 在 push/PR 时自动运行免费离线测试
+
+【v5.0 API 后端】
+  SERVICE:   无状态评估服务复用 Grammar/Vocabulary/Coach 节点
+  API:       FastAPI 提供 /health 与 /api/v1/evaluate
+  SECURITY:  模型惰性初始化，API Key 仅保留在服务器环境变量
 ================================================================================
 """
 
@@ -53,6 +58,7 @@ import os
 import json
 import time
 import random
+from functools import lru_cache
 from typing import TypedDict, Annotated
 from datetime import datetime
 import operator
@@ -80,21 +86,36 @@ from evaluation_models import (
 # 第1部分：模型配置
 # ============================================================================
 
-API_KEY = os.environ.get("DASHSCOPE_API_KEY") or os.environ.get("OPENAI_API_KEY")
-if not API_KEY:
-    raise RuntimeError(
-        "未设置 DASHSCOPE_API_KEY（兼容旧变量 OPENAI_API_KEY），"
-        "请通过环境变量提供 DashScope API 密钥。"
+class MissingAPIKeyError(RuntimeError):
+    """Raised when a model-backed operation starts without a server API key."""
+
+
+def model_is_configured() -> bool:
+    """Return whether the server process has a supported model API key."""
+    return bool(
+        os.environ.get("DASHSCOPE_API_KEY")
+        or os.environ.get("OPENAI_API_KEY")
     )
 
-model = ChatOpenAI(
-    model="qwen-turbo",
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-    api_key=API_KEY,
-    temperature=0.7,
-)
 
-print(f"✅ 模型初始化完成：qwen-turbo @ dashscope.aliyuncs.com")
+@lru_cache(maxsize=1)
+def get_model() -> ChatOpenAI:
+    """Create the model lazily so imports and health checks do not require a key."""
+    api_key = (
+        os.environ.get("DASHSCOPE_API_KEY")
+        or os.environ.get("OPENAI_API_KEY")
+    )
+    if not api_key:
+        raise MissingAPIKeyError(
+            "未设置 DASHSCOPE_API_KEY（兼容旧变量 OPENAI_API_KEY），"
+            "请通过环境变量提供 DashScope API 密钥。"
+        )
+    return ChatOpenAI(
+        model="qwen-turbo",
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        api_key=api_key,
+        temperature=0.7,
+    )
 
 
 # ============================================================================
@@ -215,9 +236,6 @@ IELTS_PART2_QUESTION_BANK = [
         "category": "地点类 (Places)"
     },
 ]
-
-print(f"✅ 题库加载完成：共 {len(IELTS_PART2_QUESTION_BANK)} 道 Part 2 题目")
-
 
 # ============================================================================
 # 第2部分：工具定义（评分标准4 — 2种工具）
@@ -377,7 +395,7 @@ class AgentState(TypedDict):
 
 def invoke_grounded_evaluation(schema, messages: list, answer: str):
     """Invoke a structured judge and reject quotes not found in the answer."""
-    structured_model = model.with_structured_output(
+    structured_model = get_model().with_structured_output(
         schema,
         method="function_calling",
     )
@@ -408,7 +426,7 @@ def invoke_aligned_coach(
     vocabulary: VocabularyEvaluation,
 ) -> CoachEvaluation:
     """Retry coach output when scores or advice contradict specialist evidence."""
-    structured_model = model.with_structured_output(
+    structured_model = get_model().with_structured_output(
         CoachEvaluation,
         method="function_calling",
     )
@@ -423,8 +441,8 @@ def invoke_aligned_coach(
                     HumanMessage(content=(
                         "上一次输出未通过 CoachEvaluation 结构校验。"
                         f"校验错误：{error}。请修正字段后重新生成；"
-                        "有 related_issue_categories 的建议必须视为 issue 类型，"
-                        "issue 类型建议必须至少关联一个真实问题类别。"
+                        "issue 类型建议必须至少关联一个真实问题类别；"
+                        "strength 类型建议不代表已经诊断出的弱项。"
                     ))
                 )
                 continue
@@ -913,8 +931,16 @@ def head_coach_node(state: AgentState) -> dict:
     print("=" * 65)
 
     # ---- 读取长期记忆 ----
-    print("\n  📖 读取长期记忆文件...")
-    profile = load_long_term_memory(state.get("profile_path", "Qiuyi_ielts_profile.json"))
+    profile_path = state.get("profile_path", "Qiuyi_ielts_profile.json")
+    if profile_path:
+        print("\n  📖 读取长期记忆文件...")
+        profile = load_long_term_memory(profile_path)
+    else:
+        profile = {
+            "practice_sessions": [],
+            "average_score": 0.0,
+            "cumulative_weaknesses": [],
+        }
 
     sessions = [
         session
@@ -1249,9 +1275,12 @@ def run_practice_round(graph, config: dict, round_num: int, available_questions:
 
 def main():
     """主入口：构建图 → 循环练习 → 长期记忆持续累积。"""
+    get_model()
+    print("✅ 模型初始化完成：qwen-turbo @ dashscope.aliyuncs.com")
+    print(f"✅ 题库加载完成：共 {len(IELTS_PART2_QUESTION_BANK)} 道 Part 2 题目")
     print("\n")
     print("🎓" * 33)
-    print("      交互式雅思回答陪练与文本评估系统  v4.1")
+    print("      交互式雅思回答陪练与文本评估系统  v5.0")
     print("      Interactive IELTS Answer Practice & Text Assessment")
     print("🎓" * 33)
     print()
